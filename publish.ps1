@@ -1,5 +1,5 @@
 # Globals.
-$APIKEY = "YOUR_API_KEY"
+$APIKEY = "14b157fa-a986-407f-b0f7-28bffb8f9266"
 $BASEURL = "https://infinibattle.infi.nl"
 $CONFIGURATION = "Release"
 
