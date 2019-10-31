@@ -28,8 +28,6 @@ namespace HeartsAndMinds
             // Planets behind the lines send their ships to the frontline planets.
             foreach(Planet supplyPlanet in myPlanets.Where(p => !p.IsOnFrontline))
             {
-                Console.WriteLine($"# Supplyplanet {supplyPlanet.Id} - Health {supplyPlanet.Health}");
-
                 // Send ships to all planets that are closer to the frontline
                 var planetsCloserToFrontline = supplyPlanet.NeighbouringPlanets.Where(np => np.DistanceToFrontLine < supplyPlanet.DistanceToFrontLine);
                 
@@ -51,8 +49,6 @@ namespace HeartsAndMinds
             // Frontline planets send their ships to the easiest planet to conquer.
             foreach (Planet fp in myPlanets.Where(p => p.IsOnFrontline))
             {
-                Console.WriteLine($"# Planet {fp.Id} - Health {fp.Health}");
-
                 var targets = opponentPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id).ToList();
                 targets.AddRange(neutralPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id));
 
