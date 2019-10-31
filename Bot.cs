@@ -30,6 +30,7 @@ namespace HeartsAndMinds
 
                 gamestate.Planets = ReadPlanets();
                 gamestate.Ships = ReadShips();
+                FillNeighbouringPlanets(gamestate.Planets);
 
                 line = Console.ReadLine();
                 if (line != "turn-start")
@@ -100,8 +101,8 @@ namespace HeartsAndMinds
                 Radius = float.Parse(parts[4]),
                 Owner = ParseOwner(parts[5]),
                 Health = float.Parse(parts[6]),
-                Neighbors = ReadNeighbors(),
-            };
+                Neighbors = ReadNeighbors()
+          };
         }
 
         private static int[] ReadNeighbors()
@@ -117,7 +118,21 @@ namespace HeartsAndMinds
             return parts.Skip(1).Select(int.Parse).ToArray();
         }
 
-    private static List<Ship> ReadShips() {
+        private static void FillNeighbouringPlanets(List<Planet> planets)
+        {
+            foreach (Planet planet in planets)
+            {
+                planet.NeighbouringPlanets = new List<Planet>();
+            }
+
+            foreach (Planet planet in planets)
+            {
+                planets.Where(ps => ps.Neighbors.Contains(planet.Id)).ToList().ForEach(ps => ps.NeighbouringPlanets.Add(planet));
+            }
+             
+        }
+
+        private static List<Ship> ReadShips() {
             var shipCount = ReadInt("num-ships");
             var ships = new List<Ship>();
 
