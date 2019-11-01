@@ -46,16 +46,31 @@ namespace HeartsAndMinds
                 targets.ToList().ForEach(t => moves.Add(new Move(amountToSend, supplyPlanet.Id, t.Id)));
             }
 
-            // Frontline planets send their ships to the easiest planet to conquer.
+            // Frontline planets send their ships to the easiest planet to conquer, but keep enough ships to resist attack.
             foreach (Planet fp in myPlanets.Where(p => p.IsOnFrontline))
             {
+                // How does the future of this planet look?
+                if (fp.WillLoseControlInTheFuture)
+                {
+                    Console.WriteLine("# Will lose control");
+                    // We are going to be conquered, or revert to neutral, if nothing changes.
+                    // Don't make the situation worse and keep all ships on the planet.
+                    continue;
+                }
+
+
+                float shipsAvailable = MathF.Min(fp.FutureHealth.Min(state => state.HealthBeforeGrowth) - 0.1F,  // -0.1 to be on the safe side.
+                                                fp.Health - 1.01F);
+                
+                if (shipsAvailable < 0F)
+                {
+                    continue;
+                }
+
                 var targets = opponentPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id).ToList();
                 targets.AddRange(neutralPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id));
 
-                float amountToSend = fp.Health * 0.7F;
-                if (fp.Health - amountToSend < 1.0F) continue;
-                
-                moves.Add(new Move(amountToSend, fp.Id, allPlanets.Where(p => targets.Contains(p.Id)).OrderBy(p => p.Health).First().Id));
+                moves.Add(new Move(shipsAvailable, fp.Id, allPlanets.Where(p => targets.Contains(p.Id)).OrderBy(p => p.Health).First().Id));
             }
 
             return moves.ToArray();

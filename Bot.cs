@@ -31,6 +31,7 @@ namespace HeartsAndMinds
                 gamestate.Planets = ReadPlanets();
                 gamestate.Ships = ReadShips();
                 FillNeighbouringPlanets(gamestate.Planets);
+                FillFutureHealth(gamestate);
 
                 line = Console.ReadLine();
                 if (line != "turn-start")
@@ -132,6 +133,110 @@ namespace HeartsAndMinds
              
         }
 
+        private static void FillFutureHealth(GameState gamestate)
+        {
+            foreach(Planet planet in gamestate.Planets)
+            {
+                List<PlanetState> planetFuture = new List<PlanetState>();
+
+                var incomingShips = gamestate.Ships.Where(s => s.TargetId == planet.Id).Select(s =>
+                                    new
+                                    {
+                                        s.Owner,
+                                        s.Power,
+                                        TurnsToLand = (int)MathF.Floor(MathF.Sqrt(MathF.Pow(s.X - planet.X, 2.0F) + MathF.Pow(s.Y - planet.Y, 2.0F)) / 15.0F)       // Not sure why this shouldn't be Math.Ceiling.
+                                    });
+
+                PlanetState lastState = new PlanetState()
+                {
+                    HealthBeforeGrowth = float.PositiveInfinity,        // Unknown
+                    HealthEndOfTurn = planet.Health,
+                    Owner = planet.Owner
+                };
+
+                planetFuture.Add(new PlanetState()
+                {
+                    HealthBeforeGrowth = float.PositiveInfinity,        // Unknown
+                    HealthEndOfTurn = planet.Health,
+                    Owner = planet.Owner
+                });
+
+                if (!incomingShips.Any())
+                {
+                    planet.FutureHealth = planetFuture;
+                    continue;
+                }
+
+//                Console.WriteLine($"# Incoming ships for planet {planet.Id}");
+//                Console.WriteLine($"# " + String.Join(" --- ", incomingShips.Select(s => s.Owner + "/" + s.Power + "/" + s.TurnsToLand)));
+
+//                Console.WriteLine($"# Starting health is {lastState.HealthEndOfTurn}, owner is {lastState.Owner}");
+                for (int turn = 1; turn <= incomingShips.Max(i => i.TurnsToLand);turn++)
+                {
+                    lastState.HealthBeforeGrowth = lastState.HealthEndOfTurn;
+
+                    foreach (var landingShip in incomingShips.Where(i => i.TurnsToLand == turn))
+                    {
+                        switch (lastState.Owner)
+                        {
+                            case null:
+                                lastState.HealthBeforeGrowth -= landingShip.Power;
+                                if (lastState.HealthBeforeGrowth < 0)
+                                {
+                                    lastState.HealthBeforeGrowth = -1.0F * lastState.HealthBeforeGrowth;
+                                    lastState.Owner = landingShip.Owner;
+                                }
+                    //            Console.WriteLine($"# Health is now {lastState.HealthBeforeGrowth}, owner is {lastState.Owner}");
+
+                                break;
+                            case 0:
+                            case 1:
+                                if (landingShip.Owner == lastState.Owner)
+                                {
+                                    lastState.HealthBeforeGrowth += landingShip.Power;
+                                }
+                                else
+                                {
+                                    lastState.HealthBeforeGrowth -= landingShip.Power;
+                                }
+
+                                if (lastState.HealthBeforeGrowth < 0)
+                                {
+                                    lastState.HealthBeforeGrowth = -1.0F * lastState.HealthBeforeGrowth;
+                                    lastState.Owner = landingShip.Owner;
+                                }
+                                else if (lastState.HealthBeforeGrowth == 0)
+                                {
+                                    lastState.Owner = null;
+                                }
+              //                  Console.WriteLine($"# Health is now {lastState.HealthBeforeGrowth}, owner is {lastState.Owner}");
+
+                                break;
+                        }
+                    }
+
+                    if (lastState.Owner != null)
+                    {
+                        lastState.HealthEndOfTurn = lastState.HealthBeforeGrowth + (planet.Radius * 0.05F);
+                    } else
+                    {
+                        lastState.HealthEndOfTurn = lastState.HealthBeforeGrowth;
+                    }
+
+         //           Console.WriteLine($"# Health after growth is {lastState.HealthEndOfTurn}");
+
+                    planetFuture.Add(new PlanetState()
+                    {
+                        HealthBeforeGrowth = lastState.HealthBeforeGrowth,
+                        HealthEndOfTurn = lastState.HealthEndOfTurn,
+                        Owner = lastState.Owner
+                    });
+                }
+
+                planet.FutureHealth = planetFuture;
+            }
+        }
+
         private static List<Ship> ReadShips() {
             var shipCount = ReadInt("num-ships");
             var ships = new List<Ship>();
@@ -146,7 +251,7 @@ namespace HeartsAndMinds
         private static Ship ReadShip() {
             var line = Console.ReadLine();
             var parts = line.Split();
-
+            
             if (parts.Length != 6 || parts[0] != "ship") {
                 throw new Exception($"Expected 'ship <x> <y> <target_id> <owner> <power>', got '{line}'");
             }

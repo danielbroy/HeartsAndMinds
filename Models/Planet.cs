@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace HeartsAndMinds.Models {
     internal class Planet {
@@ -19,6 +20,16 @@ namespace HeartsAndMinds.Models {
         public int[] Neighbors { get; set; }
 
         public List<Planet> NeighbouringPlanets { get; set; }
+
+        public List<PlanetState> FutureHealth { get; set; }
+
+        public bool WillLoseControlInTheFuture
+        {
+            get
+            {
+                return this.FutureHealth.Where(state => state.Owner != this.Owner).Any();
+            }
+        }
 
         public bool IsOnFrontline {  get { return (DistanceToFrontLine ?? -1) == 0; } }
 
