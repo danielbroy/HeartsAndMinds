@@ -28,6 +28,24 @@ namespace HeartsAndMinds
             // Planets behind the lines send their ships to the frontline planets.
             foreach (Planet supplyPlanet in myPlanets.Where(p => !p.IsOnFrontline))
             {
+                // How does the future of this planet look?
+                if (supplyPlanet.WillLoseControlInTheFuture)
+                {
+                    Console.WriteLine("# Will lose control");
+                    // We are going to be conquered, or revert to neutral, if nothing changes.
+                    // Don't make the situation worse and keep all ships on the planet.
+                    continue;
+                }
+
+                // How many ships do we have to spare?
+                float shipsAvailable = MathF.Min(supplyPlanet.FutureHealth.Min(state => state.HealthBeforeGrowth) - 0.1F,  // -0.1 to be on the safe side.
+                                                supplyPlanet.Health - 1.01F);
+
+                if (shipsAvailable < 0F)
+                {
+                    continue;
+                }
+
                 // Send ships to all planets that are closer to the frontline
                 var planetsCloserToFrontline = supplyPlanet.NeighbouringPlanets.Where(np => np.DistanceToFrontLine < supplyPlanet.DistanceToFrontLine);
 
@@ -41,7 +59,8 @@ namespace HeartsAndMinds
                 int closestDistanceToFrontLine = planetsCloserToFrontline.Min(p => p.DistanceToFrontLine ?? 0);    // Because these are my planets, DistanceToFrontLine is never null.
 
                 var targets = planetsCloserToFrontline.Where(p => p.DistanceToFrontLine == closestDistanceToFrontLine);
-                float amountToSend = (supplyPlanet.Health - 1.01F) / targets.Count();
+
+                float amountToSend = shipsAvailable / targets.Count();
 
                 targets.ToList().ForEach(t => moves.Add(new Move(amountToSend, supplyPlanet.Id, t.Id)));
             }
