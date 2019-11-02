@@ -15,7 +15,7 @@ namespace HeartsAndMinds
             // Calculate distance to the frontline for all planets.
             AddFrontlineInfoToPlanets(gamestate);
 
-            // Collect some handy info we will need.
+            // Collect some handy info we might need.
             int myPlayerId = gamestate.Settings.PlayerId;
             int opponentPlayerId = (myPlayerId == 0 ? 1 : 0);
 
@@ -26,11 +26,11 @@ namespace HeartsAndMinds
 
 
             // Planets behind the lines send their ships to the frontline planets.
-            foreach(Planet supplyPlanet in myPlanets.Where(p => !p.IsOnFrontline))
+            foreach (Planet supplyPlanet in myPlanets.Where(p => !p.IsOnFrontline))
             {
                 // Send ships to all planets that are closer to the frontline
                 var planetsCloserToFrontline = supplyPlanet.NeighbouringPlanets.Where(np => np.DistanceToFrontLine < supplyPlanet.DistanceToFrontLine);
-                
+
                 if (!planetsCloserToFrontline.Any())
                 {
                     // No planets closer to the frontline. This should be impossible, right?
@@ -46,7 +46,7 @@ namespace HeartsAndMinds
                 targets.ToList().ForEach(t => moves.Add(new Move(amountToSend, supplyPlanet.Id, t.Id)));
             }
 
-            // Frontline planets send their ships to the easiest planet to conquer, but keep enough ships to resist attack.
+            // Frontline planets send their ships to the easiest planet to conquer and that won't already fall under our control, but keep enough ships to resist attack.
             foreach (Planet fp in myPlanets.Where(p => p.IsOnFrontline))
             {
                 // How does the future of this planet look?
@@ -58,24 +58,65 @@ namespace HeartsAndMinds
                     continue;
                 }
 
-
+                // How many ship do we have to spare?
                 float shipsAvailable = MathF.Min(fp.FutureHealth.Min(state => state.HealthBeforeGrowth) - 0.1F,  // -0.1 to be on the safe side.
                                                 fp.Health - 1.01F);
-                
+
                 if (shipsAvailable < 0F)
                 {
                     continue;
                 }
 
-                var targets = opponentPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id).ToList();
-                targets.AddRange(neutralPlanets.Where(p => p.Neighbors.Contains(fp.Id)).Select(p => p.Id));
 
-                moves.Add(new Move(shipsAvailable, fp.Id, allPlanets.Where(p => targets.Contains(p.Id)).OrderBy(p => p.Health).First().Id));
+                // What is going to be our target?
+
+                // First collect all potential targets.
+                var targets = fp.NeighbouringPlanets.Where(n => n.Owner != myPlayerId);
+
+                // Choose the first suitable target with the least health.
+                bool targetFound = false;
+                int targetId = -1;
+                foreach (Planet potentialTarget in targets.OrderBy(p => p.Health))
+                {
+                  //  Console.WriteLine($"# Planet {fp.Id} considering planet {potentialTarget.Id} (Health {potentialTarget.Health})");
+                    // If we are sure that we are going to conquer this target, and there are no enemy planets nearby that could change that, then we don't need to send ships to this target.
+                    if ((potentialTarget.FutureHealth.Last().Owner == myPlayerId) &&
+                            !potentialTarget.NeighbouringPlanets.Any(np => np.Owner == opponentPlayerId))
+                    {
+                    //    Console.WriteLine("# Skipping");
+                        // Skip to next target.
+                        continue;
+                    }
+                    else
+                    {
+                        // Choose this target.
+                      //  Console.WriteLine("# Choosing");
+                        targetFound = true;
+                        targetId = potentialTarget.Id;
+                        break;
+                    }
+                }
+
+                // Send ships
+                if (targetFound)
+                {
+                    moves.Add(new Move(shipsAvailable, fp.Id, targetId));
+                }
+                else
+                {
+                    // No target found. Divide ships over all possible targets.
+                    foreach (Planet potentialTarget in targets)
+                    {
+                        moves.Add(new Move(shipsAvailable/targets.Count(), fp.Id, potentialTarget.Id));
+                    }
+                }
+
             }
 
             return moves.ToArray();
         }
-
+        
+        // Determine which planets are on the frontline.
         private static void AddFrontlineInfoToPlanets(GameState gamestate)
         {
             var allPlanets = gamestate.Planets;
