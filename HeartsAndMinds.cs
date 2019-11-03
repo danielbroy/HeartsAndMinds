@@ -8,8 +8,19 @@ namespace HeartsAndMinds
 {
     internal static class HeartsAndMinds
     {
+        static private int turnCounter = 0;
+
         public static Move[] Strategy(GameState gamestate)
         {
+            turnCounter++;
+            bool deadlock = false;
+
+            if (turnCounter >= 400)
+            {
+                Console.WriteLine("# Berzerker mode!");
+                deadlock = true;
+            }
+
             var moves = new List<Move>();
 
             // Calculate distance to the frontline for all planets.
@@ -93,7 +104,7 @@ namespace HeartsAndMinds
 
                 // Are we in the expansion phase? (=no enemies as neighbours)
                 bool expansionLogic = !fp.NeighbouringPlanets.Any(n => n.Owner == opponentPlayerId);
-
+                
                 // Collect all potential targets and order them according to our preference.
                 List<Planet> targets;
                 if (expansionLogic)
@@ -107,7 +118,7 @@ namespace HeartsAndMinds
                     targets = fp.NeighbouringPlanets.Where(n => n.Owner != myPlayerId).OrderBy(p => p.Health).ToList();
                 }
 
-                if (expansionLogic && fp.Neighbors.Any(n => needHelp.ContainsKey(n)))
+                if ((deadlock || expansionLogic) && fp.Neighbors.Any(n => needHelp.ContainsKey(n)))
                 {
                     foreach (Planet needsHelp in fp.NeighbouringPlanets.Where(n => needHelp.ContainsKey(n.Id))) {
                         if (shipsAvailable <= 0.001F)
@@ -152,7 +163,7 @@ namespace HeartsAndMinds
                         moves.Add(new Move(numOfShipsToSend, fp.Id, potentialTarget.Id));
                         shipsAvailable -= numOfShipsToSend;
 
-                        if (expansionLogic && numOfShipsToSend < potentialTarget.Health + 0.09F)
+                        if ((deadlock || expansionLogic) && numOfShipsToSend < potentialTarget.Health + 0.09F)
                         {
                             needHelp.Add(potentialTarget.Id, potentialTarget.Health - numOfShipsToSend + 0.1F);
                         }
