@@ -3,7 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 
 namespace HeartsAndMinds.Models {
-    internal class Planet {
+    internal class Planet : IEquatable<Planet>
+    {
         public int Id { get; set; }
         public float X { get; set; }
         public float Y { get; set; }
@@ -41,6 +42,24 @@ namespace HeartsAndMinds.Models {
         public override string ToString()
         {
             return $"planet {Id} - ({X},{Y}) - Owner {Owner} - Distance {DistanceToFrontLine}";
+        }
+
+        public override bool Equals(object obj)
+        {
+            if ((obj == null) || !(obj is Planet)) return false;
+
+            return ((Planet)obj).Id == this.Id;
+        }
+
+        public bool Equals(Planet other)
+        {
+            return other != null &&
+                   Id == other.Id;
+        }
+
+        public override int GetHashCode()
+        {
+            return HashCode.Combine(Id);
         }
     }
 }

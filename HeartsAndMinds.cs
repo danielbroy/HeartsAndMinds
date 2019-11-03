@@ -46,25 +46,35 @@ namespace HeartsAndMinds
                     continue;
                 }
 
-                // Send ships to all planets that are closer to the frontline
-                var planetsCloserToFrontline = supplyPlanet.NeighbouringPlanets.Where(np => np.DistanceToFrontLine < supplyPlanet.DistanceToFrontLine);
-
-                if (!planetsCloserToFrontline.Any())
+                // Are there neighbours that are going to be conquered?
+                if (supplyPlanet.NeighbouringPlanets.Any(np => np.WillLoseControlInTheFuture))
                 {
-                    // No planets closer to the frontline. This should be impossible, right?
-                    Console.WriteLine("# No targets closer to the frontline found: FIXME");
+                    // Send our ships to the nearest one, to try to help.
+                    moves.Add(new Move(shipsAvailable, supplyPlanet.Id, supplyPlanet.NeighbouringPlanets.Where(np => np.WillLoseControlInTheFuture).OrderBy(np => np.DistanceTo(supplyPlanet)).First().Id));
                     continue;
+                } else
+                {
+                    // Otherwise, send ships to all planets that are closer to the frontline
+                    var planetsCloserToFrontline = supplyPlanet.NeighbouringPlanets.Where(np => np.DistanceToFrontLine < supplyPlanet.DistanceToFrontLine);
+
+                    if (!planetsCloserToFrontline.Any())
+                    {
+                        // No planets closer to the frontline. This should be impossible, right?
+                        Console.WriteLine("# No targets closer to the frontline found: FIXME");
+                        continue;
+                    }
+
+                    int closestDistanceToFrontLine = planetsCloserToFrontline.Min(p => p.DistanceToFrontLine ?? 0);    // Because these are my planets, DistanceToFrontLine is never null.
+
+                    var targets = planetsCloserToFrontline.Where(p => p.DistanceToFrontLine == closestDistanceToFrontLine);
+
+                    float amountToSend = shipsAvailable / targets.Count();
+
+                    targets.ToList().ForEach(t => moves.Add(new Move(amountToSend, supplyPlanet.Id, t.Id)));
                 }
-
-                int closestDistanceToFrontLine = planetsCloserToFrontline.Min(p => p.DistanceToFrontLine ?? 0);    // Because these are my planets, DistanceToFrontLine is never null.
-
-                var targets = planetsCloserToFrontline.Where(p => p.DistanceToFrontLine == closestDistanceToFrontLine);
-
-                float amountToSend = shipsAvailable / targets.Count();
-
-                targets.ToList().ForEach(t => moves.Add(new Move(amountToSend, supplyPlanet.Id, t.Id)));
             }
 
+            Dictionary<int, float> needHelp = new Dictionary<int, float>();
             // Frontline planets send their ships to the easiest planet to conquer and that won't already fall under our control, but keep enough ships to resist attack.
             foreach (Planet fp in myPlanets.Where(p => p.IsOnFrontline))
             {
@@ -97,6 +107,29 @@ namespace HeartsAndMinds
                     targets = fp.NeighbouringPlanets.Where(n => n.Owner != myPlayerId).OrderBy(p => p.Health).ToList();
                 }
 
+                if (expansionLogic && fp.Neighbors.Any(n => needHelp.ContainsKey(n)))
+                {
+                    foreach (Planet needsHelp in fp.NeighbouringPlanets.Where(n => needHelp.ContainsKey(n.Id))) {
+                        if (shipsAvailable <= 0.001F)
+                        {
+                            break;
+                        }
+
+                        if (needHelp[needsHelp.Id] < 0.01F)
+                        {
+                            targets.Remove(needsHelp);
+                            continue;
+                        }
+
+                        float numOfShipsToSend = Math.Min(needHelp[needsHelp.Id], shipsAvailable);
+                        moves.Add(new Move(numOfShipsToSend, fp.Id, needsHelp.Id));
+                        shipsAvailable -= numOfShipsToSend;
+
+                        needHelp[needsHelp.Id] -= numOfShipsToSend;
+                        targets.Remove(needsHelp);
+                    }
+                }
+
                 foreach (Planet potentialTarget in targets)
                 { 
                     if (shipsAvailable <= 0.001F)
@@ -118,6 +151,11 @@ namespace HeartsAndMinds
 
                         moves.Add(new Move(numOfShipsToSend, fp.Id, potentialTarget.Id));
                         shipsAvailable -= numOfShipsToSend;
+
+                        if (expansionLogic && numOfShipsToSend < potentialTarget.Health + 0.09F)
+                        {
+                            needHelp.Add(potentialTarget.Id, potentialTarget.Health - numOfShipsToSend + 0.1F);
+                        }
                     }
                 }
 
