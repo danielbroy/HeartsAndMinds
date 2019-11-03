@@ -81,49 +81,49 @@ namespace HeartsAndMinds
                 float shipsAvailable = MathF.Min(fp.FutureHealth.Min(state => state.HealthBeforeGrowth) - 0.1F,  // -0.1 to be on the safe side.
                                                 fp.Health - 1.01F);
 
-                if (shipsAvailable < 0F)
+                // Are we in the expansion phase? (=no enemies as neighbours)
+                bool expansionLogic = !fp.NeighbouringPlanets.Any(n => n.Owner == opponentPlayerId);
+
+                // Collect all potential targets and order them according to our preference.
+                List<Planet> targets;
+                if (expansionLogic)
                 {
-                    continue;
+                    // In the expansion phase, attack the nearest planet first.
+                    targets = fp.NeighbouringPlanets.Where(n => n.Owner == null).OrderBy(n => n.DistanceTo(fp)).ThenBy(n => n.Health).ToList();
+                }
+                else
+                {
+                    // When we have enemies nearby, attack the weakest planet first.
+                    targets = fp.NeighbouringPlanets.Where(n => n.Owner != myPlayerId).OrderBy(p => p.Health).ToList();
                 }
 
-
-                // What is going to be our target?
-
-                // First collect all potential targets.
-                var targets = fp.NeighbouringPlanets.Where(n => n.Owner != myPlayerId);
-
-                // Choose the first suitable target with the least health.
-                bool targetFound = false;
-                int targetId = -1;
-                foreach (Planet potentialTarget in targets.OrderBy(p => p.Health))
-                {
-                  //  Console.WriteLine($"# Planet {fp.Id} considering planet {potentialTarget.Id} (Health {potentialTarget.Health})");
+                foreach (Planet potentialTarget in targets)
+                { 
+                    if (shipsAvailable <= 0.001F)
+                    {
+                        break;
+                    }
+                    
                     // If we are sure that we are going to conquer this target, and there are no enemy planets nearby that could change that, then we don't need to send ships to this target.
                     if ((potentialTarget.FutureHealth.Last().Owner == myPlayerId) &&
-                            !potentialTarget.NeighbouringPlanets.Any(np => np.Owner == opponentPlayerId))
+                                !potentialTarget.NeighbouringPlanets.Any(np => np.Owner == opponentPlayerId))
                     {
-                    //    Console.WriteLine("# Skipping");
                         // Skip to next target.
                         continue;
                     }
                     else
                     {
-                        // Choose this target.
-                      //  Console.WriteLine("# Choosing");
-                        targetFound = true;
-                        targetId = potentialTarget.Id;
-                        break;
+                        // Choose this target. Only send enough ships to conquer.
+                        float numOfShipsToSend = Math.Min(potentialTarget.Health + 0.1F, shipsAvailable);
+
+                        moves.Add(new Move(numOfShipsToSend, fp.Id, potentialTarget.Id));
+                        shipsAvailable -= numOfShipsToSend;
                     }
                 }
 
-                // Send ships
-                if (targetFound)
+                if (shipsAvailable > 0.001F)
                 {
-                    moves.Add(new Move(shipsAvailable, fp.Id, targetId));
-                }
-                else
-                {
-                    // No target found. Divide ships over all possible targets.
+                    // Not all ships allocated. Divide remaining ships over all possible targets.
                     foreach (Planet potentialTarget in targets)
                     {
                         moves.Add(new Move(shipsAvailable/targets.Count(), fp.Id, potentialTarget.Id));
